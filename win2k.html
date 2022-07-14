@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <script src="https://unpkg.com/eruda"></script>
+    <script>eruda.init();</script>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Peer-to-peer v86 network test (Win2k)</title>
+</head>
+
+<body>
+    <script src="https://chr15m.github.io/bugout/bugout.min.js"></script>
+    <script src="https://copy.sh/v86/build/libv86.js"></script>
+    <script>
+        "use strict";
+        // If that doesn't work there's https://api.puter.com/pubfile?token=ea2a9cb3-fa6a-4b7c-a422-f19d1dbf414d
+        window.onload = function () {
+            var emulator = window.emulator = new V86Starter({
+                wasm_path: "https://cors-anywhere.9pfs.repl.co/copy.sh/v86/build/v86.wasm",
+                screen_container: document.getElementById("screen_container"),
+                bios: {
+                    url: "https://cors-anywhere.9pfs.repl.co/copy.sh/v86/bios/seabios.bin",
+                },
+                vga_bios: {
+                    url: "https://cors-anywhere.9pfs.repl.co/copy.sh/v86/bios/vgabios.bin",
+                },
+                memory_size: 512 * 1024 * 1024,
+                vga_memory_size: 8 * 1024 * 1024,
+                hda: {
+                    url: "https://k.copy.sh/windows2k.img",
+                    async: true,
+                    use_parts: true,
+                    size: 2 * 1024 * 1024 * 1024,
+                },
+                initial_state: {
+                    "url": "https://k.copy.sh/windows2k_state.bin.zst",
+                },
+                preserve_mac_from_state_image: true,
+                autostart: true,
+            });
+            var b = new Bugout("v86-vlan");
+            // From https://bitcoin.stackexchange.com/a/52728
+            function toHexString(byteArray) {
+                return Array.prototype.map.call(byteArray, function (byte) {
+                    return ('0' + (byte & 0xFF).toString(16)).slice(-2);
+                }).join('');
+            }
+            function toByteArray(hexString) {
+                var result = [];
+                for (var i = 0; i < hexString.length; i += 2) {
+                    result.push(parseInt(hexString.substr(i, 2), 16));
+                }
+                return result;
+            }
+            b.on("message", function (address, message) {
+                emulator.bus.send("net0-receive", new Uint8Array(toByteArray(message)));
+                // console.log(`Packet from ${address}: ${message}`);
+            });
+            b.on("seen", function (peer) {
+                console.log(`Seen ${peer}`);
+            })
+            emulator.bus.register("net0-send", function (data) {
+                b.send(toHexString(data));
+            });
+        };
+    </script>
+
+    <!-- A minimal structure for the ScreenAdapter defined in browser/screen.js -->
+    <div id="screen_container">
+        <div style="white-space: pre; font: 14px monospace; line-height: 14px"></div>
+        <canvas style="display: none"></canvas>
+    </div>
+</body>
+
+</html>
